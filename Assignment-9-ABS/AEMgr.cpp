@@ -79,6 +79,12 @@ AEState AbstractExecutionMgr::test2()
     // TODO: put your code in the following braces
     //@{
     //@}
+    NodeID malloc = getNodeID("malloc");
+    as[p] = AddressValue(getMemObjAddress("malloc"));
+    as.storeValue(p, IntervalValue(0, 0));
+    as[q] = as.loadValue(p);
+    as.storeValue(p, IntervalValue(3, 3));
+    as[b] = as.loadValue(p).getInterval() + IntervalValue(1, 1);
 
     as.printAbstractState();
     return as;
@@ -108,6 +114,14 @@ AEState AbstractExecutionMgr::test3()
     // TODO: put your code in the following braces
     //@{
     //@}
+    NodeID malloc1 = getNodeID("malloc1");
+    NodeID malloc2 = getNodeID("malloc2");
+    as[p] = AddressValue(getMemObjAddress("malloc1"));
+    as[q] = AddressValue(getMemObjAddress("malloc2"));
+    as.storeValue(p, as[q]);
+    as.storeValue(q, IntervalValue(10, 10));
+    as[r] = as.loadValue(p);
+    as[x] = as.loadValue(r);
 
     as.printAbstractState();
     return as;
@@ -137,6 +151,14 @@ AEState AbstractExecutionMgr::test4()
     // TODO: put your code in the following braces
     //@{
     //@}
+    NodeID malloc = getNodeID("malloc");
+    as[p] = AddressValue(getMemObjAddress("malloc"));
+    as[x] = AddressValue(getGepObjAddress("malloc", 0));
+    as[y] = AddressValue(getGepObjAddress("malloc", 1));
+    as.storeValue(x, IntervalValue(10, 10));
+    as.storeValue(y, IntervalValue(11, 11));
+    as[a] = as.loadValue(x);
+    as[b] = as.loadValue(y);
 
     as.printAbstractState();
     return as;
@@ -175,6 +197,17 @@ AEState AbstractExecutionMgr::test5()
     // TODO: put your code in the following braces
     //@{
     //@}
+    NodeID malloc1 = getNodeID("malloc1");
+    NodeID malloc2 = getNodeID("malloc2");
+    as[p] = AddressValue(getMemObjAddress("malloc1"));
+    as[x] = AddressValue(getMemObjAddress("malloc2"));
+    as.storeValue(x, IntervalValue(5, 5));
+    as[q] = AddressValue(getGepObjAddress("malloc1", 0));
+    as.storeValue(q, IntervalValue(10, 10));
+    as[r] = AddressValue(getGepObjAddress("malloc1", 1));
+    as.storeValue(r, as[x]);
+    as[y] = as.loadValue(r);
+    as[z] = as.loadValue(q).getInterval() + as.loadValue(y).getInterval();
 
     as.printAbstractState();
     return as;
@@ -198,6 +231,12 @@ AEState AbstractExecutionMgr::test6()
     // TODO: put your code in the following braces
     //@{
     //@}
+    as[arg] = IntervalValue(4, 10);
+    as[a] = as[arg].getInterval() + IntervalValue(1, 1);
+    as[b] = IntervalValue(5, 5);
+    AEState as_if = as;
+    as_if[b] = as_if[a];
+    as.joinWith(as_if);
 
     as.printAbstractState();
     return as;
@@ -223,6 +262,11 @@ AEState AbstractExecutionMgr::test7()
     // TODO: put your code in the following braces
     //@{
     //@}
+    NodeID k = getNodeID("k");
+    as[k] = IntervalValue(2, 2);
+    as[y] = as[k];
+    as[k] = IntervalValue(3, 3);
+    as[x] = as[k];
 
     as.printAbstractState();
     return as;
@@ -249,6 +293,41 @@ AEState AbstractExecutionMgr::test8()
     // TODO: put your code in the following braces
     //@{
     //@}
+    entry_as[x] = IntervalValue(20, 20);
+    head_as = entry_as;
+    bool increase = true;
+    bool widening = false;
+    u32_t iter = 0;
+    while (true) {
+        AEState cur_body_as = body_as;
+        AEState cur_head_as = head_as;
+        head_as = entry_as;
+        head_as.joinWith(body_as);
+        if (iter >= widen_delay) {
+            if (increase) {
+                head_as.widening(cur_head_as);
+                if (head_as == cur_head_as) {
+                    increase = false;
+                    widening = true;
+                    continue;
+                }
+            } else {
+                head_as.narrowing(cur_head_as);
+                if (head_as == cur_head_as) {
+                    break;
+                }
+            }
+        }
+        body_as = head_as;
+        body_as[x].meet_with(IntervalValue(1, IntervalValue::plus_infinity()));
+        body_as[x] = body_as[x].getInterval() + IntervalValue(-1, -1);
+        if (body_as == cur_body_as && !widening) {
+            break;
+        }
+        iter++;
+    }
+    exit_as = body_as;
+    exit_as[x].meet_with(IntervalValue(IntervalValue::minus_infinity(), 0));
 
     exit_as.printAbstractState();
     return exit_as;
